@@ -256,7 +256,7 @@
   table {
     width: 100%;
     border-collapse: collapse;
-    min-width: 700px;
+    min-width: 850px;
   }
 
   thead th {
@@ -275,6 +275,27 @@
   }
 
   thead th:first-child { padding-left: 20px; }
+
+  thead th.sortable {
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.15s;
+  }
+  thead th.sortable:hover { color: var(--accent); }
+  thead th .sort-arrow {
+    display: inline-block;
+    margin-left: 4px;
+    font-size: 10px;
+    opacity: 0.3;
+    transition: opacity 0.15s;
+  }
+  thead th.sorted .sort-arrow { opacity: 1; color: var(--accent); }
+
+  .sample-date {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--orange);
+  }
 
   tbody tr {
     border-bottom: 1px solid var(--border);
@@ -654,16 +675,17 @@
         <thead>
           <tr>
             <th>Image</th>
-            <th>Sample Name</th>
-            <th>Sample ID</th>
-            <th>Description</th>
-            <th>Current Owner</th>
+            <th class="sortable" onclick="sortBy('name')">Sample Name <span class="sort-arrow">▲</span></th>
+            <th class="sortable" onclick="sortBy('sampleId')">Sample ID <span class="sort-arrow">▲</span></th>
+            <th class="sortable" onclick="sortBy('description')">Description <span class="sort-arrow">▲</span></th>
+            <th class="sortable" onclick="sortBy('owner')">Current Owner <span class="sort-arrow">▲</span></th>
+            <th class="sortable" onclick="sortBy('date')">Date <span class="sort-arrow">▲</span></th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody id="table-body">
           <tr>
-            <td colspan="6">
+            <td colspan="7">
               <div class="empty-state">
                 <div class="empty-icon">🔬</div>
                 <p>Loading samples...</p>
@@ -699,6 +721,10 @@
       <div class="form-group">
         <label>Current Owner *</label>
         <input type="text" id="f-owner" placeholder="e.g. Filippo">
+      </div>
+      <div class="form-group">
+        <label>Date</label>
+        <input type="date" id="f-date">
       </div>
       <div class="form-group">
         <label>Sample Image</label>
@@ -761,6 +787,8 @@
   let editingKey = null;
   let selectedFile = null;
   let deleteKey = null;
+  let sortColumn = 'createdAt';
+  let sortDir = 'desc'; // 'asc' or 'desc'
 
   // ─── Real-time listener ───
   samplesRef.on('value', (snapshot) => {
@@ -789,6 +817,31 @@
     document.getElementById('image-count').textContent = withImg;
   }
 
+  // ─── Sort ───
+  function sortBy(col) {
+    if (sortColumn === col) {
+      sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      sortColumn = col;
+      sortDir = 'asc';
+    }
+    renderTable();
+  }
+
+  function updateSortHeaders() {
+    document.querySelectorAll('thead th.sortable').forEach(th => {
+      const col = th.getAttribute('onclick').match(/sortBy\('(.+?)'\)/)?.[1];
+      const arrow = th.querySelector('.sort-arrow');
+      if (col === sortColumn) {
+        th.classList.add('sorted');
+        arrow.textContent = sortDir === 'asc' ? '▲' : '▼';
+      } else {
+        th.classList.remove('sorted');
+        arrow.textContent = '▲';
+      }
+    });
+  }
+
   // ─── Render Table ───
   function renderTable() {
     const query = document.getElementById('search-input').value.toLowerCase().trim();
@@ -800,26 +853,45 @@
       return (s.name || '').toLowerCase().includes(query) ||
              (s.sampleId || '').toLowerCase().includes(query) ||
              (s.description || '').toLowerCase().includes(query) ||
-             (s.owner || '').toLowerCase().includes(query);
+             (s.owner || '').toLowerCase().includes(query) ||
+             (s.date || '').toLowerCase().includes(query);
     });
 
     if (filtered.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="6">
+      tbody.innerHTML = `<tr><td colspan="7">
         <div class="empty-state">
           <div class="empty-icon">${query ? '🔍' : '🔬'}</div>
           <p>${query ? 'No samples matching your search' : 'No samples yet — add the first one!'}</p>
         </div>
       </td></tr>`;
+      updateSortHeaders();
       return;
     }
 
-    // Sort by most recently added (newest first)
-    filtered.sort((a, b) => (b[1].createdAt || 0) - (a[1].createdAt || 0));
+    // Sort
+    filtered.sort((a, b) => {
+      let valA, valB;
+      if (sortColumn === 'createdAt') {
+        valA = a[1].createdAt || 0;
+        valB = b[1].createdAt || 0;
+      } else if (sortColumn === 'date') {
+        valA = a[1].date || '';
+        valB = b[1].date || '';
+      } else {
+        valA = (a[1][sortColumn] || '').toLowerCase();
+        valB = (b[1][sortColumn] || '').toLowerCase();
+      }
+      if (valA < valB) return sortDir === 'asc' ? -1 : 1;
+      if (valA > valB) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
 
     tbody.innerHTML = filtered.map(([key, s]) => {
       const imgCell = s.imageUrl
         ? `<img class="sample-thumb" src="${escHtml(s.imageUrl)}" alt="${escHtml(s.name)}" onclick="openViewer('${escHtml(s.imageUrl)}')" loading="lazy">`
         : `<div class="sample-thumb-placeholder">⚛</div>`;
+
+      const dateStr = s.date || '—';
 
       return `<tr>
         <td>${imgCell}</td>
@@ -827,6 +899,7 @@
         <td><span class="sample-id">${escHtml(s.sampleId || '—')}</span></td>
         <td><span class="sample-desc" title="${escHtml(s.description || '')}">${escHtml(s.description || '—')}</span></td>
         <td><span class="sample-owner">${escHtml(s.owner || '—')}</span></td>
+        <td><span class="sample-date">${escHtml(dateStr)}</span></td>
         <td>
           <div class="actions-cell">
             <button class="icon-btn" title="Edit" onclick="openEditModal('${key}')">✎</button>
@@ -835,6 +908,8 @@
         </td>
       </tr>`;
     }).join('');
+
+    updateSortHeaders();
   }
 
   function escHtml(str) {
@@ -863,6 +938,7 @@
     document.getElementById('f-id').value = s.sampleId || '';
     document.getElementById('f-desc').value = s.description || '';
     document.getElementById('f-owner').value = s.owner || '';
+    document.getElementById('f-date').value = s.date || '';
 
     selectedFile = null;
     if (s.imageUrl) {
@@ -889,6 +965,7 @@
     document.getElementById('f-id').value = '';
     document.getElementById('f-desc').value = '';
     document.getElementById('f-owner').value = '';
+    document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
     selectedFile = null;
     resetUploadArea();
   }
@@ -957,6 +1034,7 @@
     const sampleId = document.getElementById('f-id').value.trim();
     const description = document.getElementById('f-desc').value.trim();
     const owner = document.getElementById('f-owner').value.trim();
+    const date = document.getElementById('f-date').value;
 
     if (!name || !sampleId || !owner) {
       showToast('Please fill in all required fields', 'error');
@@ -988,6 +1066,7 @@
         sampleId,
         description,
         owner,
+        date,
         imageUrl,
         updatedAt: Date.now()
       };
