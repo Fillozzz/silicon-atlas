@@ -256,7 +256,7 @@
   table {
     width: 100%;
     border-collapse: collapse;
-    min-width: 850px;
+    min-width: 960px;
   }
 
   thead th {
@@ -680,12 +680,13 @@
             <th class="sortable" onclick="sortBy('description')">Description <span class="sort-arrow">▲</span></th>
             <th class="sortable" onclick="sortBy('owner')">Current Owner <span class="sort-arrow">▲</span></th>
             <th class="sortable" onclick="sortBy('date')">Date <span class="sort-arrow">▲</span></th>
+            <th class="sortable" onclick="sortBy('location')">Location <span class="sort-arrow">▲</span></th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody id="table-body">
           <tr>
-            <td colspan="7">
+            <td colspan="8">
               <div class="empty-state">
                 <div class="empty-icon">🔬</div>
                 <p>Loading samples...</p>
@@ -725,6 +726,10 @@
       <div class="form-group">
         <label>Date</label>
         <input type="date" id="f-date">
+      </div>
+      <div class="form-group">
+        <label>Location</label>
+        <input type="text" id="f-location" placeholder="e.g. ERC 151, ASU Tempe">
       </div>
       <div class="form-group">
         <label>Sample Image</label>
@@ -854,11 +859,12 @@
              (s.sampleId || '').toLowerCase().includes(query) ||
              (s.description || '').toLowerCase().includes(query) ||
              (s.owner || '').toLowerCase().includes(query) ||
-             (s.date || '').toLowerCase().includes(query);
+             (s.date || '').toLowerCase().includes(query) ||
+             (s.location || '').toLowerCase().includes(query);
     });
 
     if (filtered.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7">
+      tbody.innerHTML = `<tr><td colspan="8">
         <div class="empty-state">
           <div class="empty-icon">${query ? '🔍' : '🔬'}</div>
           <p>${query ? 'No samples matching your search' : 'No samples yet — add the first one!'}</p>
@@ -877,6 +883,9 @@
       } else if (sortColumn === 'date') {
         valA = a[1].date || '';
         valB = b[1].date || '';
+      } else if (sortColumn === 'location') {
+        valA = (a[1].location || '').toLowerCase();
+        valB = (b[1].location || '').toLowerCase();
       } else {
         valA = (a[1][sortColumn] || '').toLowerCase();
         valB = (b[1][sortColumn] || '').toLowerCase();
@@ -900,6 +909,7 @@
         <td><span class="sample-desc" title="${escHtml(s.description || '')}">${escHtml(s.description || '—')}</span></td>
         <td><span class="sample-owner">${escHtml(s.owner || '—')}</span></td>
         <td><span class="sample-date">${escHtml(dateStr)}</span></td>
+        <td><span class="sample-owner">${escHtml(s.location || '—')}</span></td>
         <td>
           <div class="actions-cell">
             <button class="icon-btn" title="Edit" onclick="openEditModal('${key}')">✎</button>
@@ -939,6 +949,7 @@
     document.getElementById('f-desc').value = s.description || '';
     document.getElementById('f-owner').value = s.owner || '';
     document.getElementById('f-date').value = s.date || '';
+    document.getElementById('f-location').value = s.location || '';
 
     selectedFile = null;
     if (s.imageUrl) {
@@ -966,6 +977,7 @@
     document.getElementById('f-desc').value = '';
     document.getElementById('f-owner').value = '';
     document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('f-location').value = '';
     selectedFile = null;
     resetUploadArea();
   }
@@ -1035,6 +1047,7 @@
     const description = document.getElementById('f-desc').value.trim();
     const owner = document.getElementById('f-owner').value.trim();
     const date = document.getElementById('f-date').value;
+    const location = document.getElementById('f-location').value.trim();
 
     if (!name || !sampleId || !owner) {
       showToast('Please fill in all required fields', 'error');
@@ -1067,6 +1080,7 @@
         description,
         owner,
         date,
+        location,
         imageUrl,
         updatedAt: Date.now()
       };
