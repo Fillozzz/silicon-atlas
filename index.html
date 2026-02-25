@@ -473,6 +473,7 @@
     padding: 14px 16px;
     font-size: 14px;
     vertical-align: top;
+    overflow: hidden;
   }
 
   td:first-child { padding-left: 20px; }
@@ -480,6 +481,10 @@
   .sample-name {
     font-weight: 600;
     color: var(--text);
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .sample-id {
@@ -489,7 +494,10 @@
     background: var(--accent-glow);
     padding: 3px 8px;
     border-radius: 6px;
-    display: inline-block;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .sample-desc {
