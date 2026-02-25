@@ -10,7 +10,7 @@
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<!-- Images stored as base64 in Realtime DB — no Storage needed -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 
 <style>
   :root {
@@ -58,13 +58,165 @@
     z-index: 0;
   }
 
+  /* ═══ LOGIN SCREEN ═══ */
+  .login-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    padding: 20px;
+  }
+
+  .login-screen.hidden {
+    display: none;
+  }
+
+  .login-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 40px 36px;
+    width: 100%;
+    max-width: 400px;
+    animation: modalIn 0.3s ease;
+  }
+
+  .login-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  .login-logo .logo-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent), var(--blue));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    box-shadow: 0 0 24px rgba(0,212,170,0.2);
+  }
+
+  .login-logo h1 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 26px;
+    font-weight: 600;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--blue) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .login-subtitle {
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: 32px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .login-card .form-group { margin-bottom: 18px; }
+
+  .login-card .form-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+
+  .login-card .form-group input {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--input-bg);
+    color: var(--text);
+    font-family: 'Outfit', sans-serif;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .login-card .form-group input:focus { border-color: var(--accent); }
+  .login-card .form-group input::placeholder { color: var(--text-muted); }
+
+  .login-btn {
+    width: 100%;
+    padding: 14px;
+    border-radius: 10px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    background: linear-gradient(135deg, var(--accent), var(--accent-dim));
+    color: #000;
+    box-shadow: 0 4px 16px rgba(0,212,170,0.2);
+    transition: all 0.2s;
+    margin-top: 8px;
+  }
+
+  .login-btn:hover { box-shadow: 0 4px 24px rgba(0,212,170,0.35); transform: translateY(-1px); }
+  .login-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .login-error {
+    margin-top: 14px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    background: rgba(255,71,87,0.1);
+    color: var(--red);
+    border: 1px solid rgba(255,71,87,0.2);
+    display: none;
+    text-align: center;
+  }
+
+  .login-error.visible { display: block; }
+
+  /* ═══ APP (hidden until auth) ═══ */
   .app {
     position: relative;
     z-index: 1;
     max-width: 1200px;
     margin: 0 auto;
     padding: 20px;
+    display: none; /* hidden until authenticated */
   }
+
+  .app.visible { display: block; }
+
+  /* ═══ SIGN-OUT BUTTON ═══ */
+  .signout-btn {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 50;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-dim);
+    transition: all 0.2s;
+    display: none;
+  }
+
+  .signout-btn.visible { display: inline-flex; align-items: center; gap: 6px; }
+  .signout-btn:hover { border-color: var(--red); color: var(--red); background: rgba(255,71,87,0.06); }
 
   /* ═══ HEADER ═══ */
   .header {
@@ -614,6 +766,7 @@
     .search-box { min-width: unset; }
     .table-wrap { border-radius: 10px; }
     .modal { margin: 10px; }
+    .login-card { padding: 32px 24px; }
   }
 
   /* scrollbar */
@@ -624,7 +777,39 @@
 </head>
 <body>
 
-<div class="app">
+<!-- ═══════════════════════════════════════════ -->
+<!--  LOGIN SCREEN                              -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="login-screen" id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="logo-icon">⚛</div>
+      <h1>SiliconAtlas</h1>
+    </div>
+    <p class="login-subtitle">Sign in to access the repository</p>
+
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" id="login-email" placeholder="lab@example.com" autocomplete="email">
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="login-password" placeholder="Enter password" autocomplete="current-password">
+    </div>
+
+    <button class="login-btn" id="login-btn" onclick="handleLogin()">Sign In</button>
+
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- Sign-out button (top-right, visible when logged in) -->
+<button class="signout-btn" id="signout-btn" onclick="handleSignOut()">⏻ Sign Out</button>
+
+<!-- ═══════════════════════════════════════════ -->
+<!--  MAIN APP (hidden until authenticated)     -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="app" id="main-app">
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
@@ -770,7 +955,7 @@
 
 <script>
   // ═══════════════════════════════════════════════
-  //  🔧 FIREBASE CONFIG — REPLACE WITH YOUR OWN
+  //  🔧 FIREBASE CONFIG
   // ═══════════════════════════════════════════════
   const firebaseConfig = {
     apiKey: "AIzaSyDO_iRY_u5hjf47EzryGn-wxttU0csDZbA",
@@ -785,6 +970,7 @@
   // ═══════════════════════════════════════════════
 
   firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
   const db = firebase.database();
   const samplesRef = db.ref('samples');
 
@@ -793,18 +979,114 @@
   let selectedFile = null;
   let deleteKey = null;
   let sortColumn = 'createdAt';
-  let sortDir = 'desc'; // 'asc' or 'desc'
+  let sortDir = 'desc';
+  let dbListener = null; // track the realtime listener
 
-  // ─── Real-time listener ───
-  samplesRef.on('value', (snapshot) => {
-    allSamples = snapshot.val() || {};
-    updateStats();
-    renderTable();
-    setSyncStatus(true);
-  }, (err) => {
-    console.error('DB error:', err);
-    setSyncStatus(false);
+  // ═══════════════════════════════════════════════
+  //  🔐 AUTH — Login / Logout / State Observer
+  // ═══════════════════════════════════════════════
+
+  // Listen for auth state changes
+  auth.onAuthStateChanged((user) => {
+    if (user) {
+      // User is signed in → show app, hide login
+      document.getElementById('login-screen').classList.add('hidden');
+      document.getElementById('main-app').classList.add('visible');
+      document.getElementById('signout-btn').classList.add('visible');
+      startDatabaseListener();
+    } else {
+      // User is signed out → show login, hide app
+      document.getElementById('login-screen').classList.remove('hidden');
+      document.getElementById('main-app').classList.remove('visible');
+      document.getElementById('signout-btn').classList.remove('visible');
+      stopDatabaseListener();
+    }
   });
+
+  // Handle login form
+  async function handleLogin() {
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+    const errorEl = document.getElementById('login-error');
+    const btn = document.getElementById('login-btn');
+
+    errorEl.classList.remove('visible');
+
+    if (!email || !password) {
+      errorEl.textContent = 'Please enter email and password';
+      errorEl.classList.add('visible');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Signing in...';
+
+    try {
+      await auth.signInWithEmailAndPassword(email, password);
+      // onAuthStateChanged will handle the UI switch
+    } catch (err) {
+      let msg = 'Sign-in failed';
+      switch (err.code) {
+        case 'auth/invalid-email': msg = 'Invalid email address'; break;
+        case 'auth/user-not-found': msg = 'Account not found'; break;
+        case 'auth/wrong-password': msg = 'Incorrect password'; break;
+        case 'auth/invalid-credential': msg = 'Invalid email or password'; break;
+        case 'auth/too-many-requests': msg = 'Too many attempts — try again later'; break;
+      }
+      errorEl.textContent = msg;
+      errorEl.classList.add('visible');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Sign In';
+    }
+  }
+
+  // Handle sign-out
+  async function handleSignOut() {
+    try {
+      await auth.signOut();
+      showToast('Signed out', 'success');
+    } catch (err) {
+      console.error('Sign-out error:', err);
+    }
+  }
+
+  // Allow Enter key to submit login form
+  document.getElementById('login-password').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') handleLogin();
+  });
+  document.getElementById('login-email').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('login-password').focus();
+  });
+
+  // ═══════════════════════════════════════════════
+  //  📡 DATABASE — start/stop listener on auth
+  // ═══════════════════════════════════════════════
+
+  function startDatabaseListener() {
+    if (dbListener) return; // already listening
+    dbListener = samplesRef.on('value', (snapshot) => {
+      allSamples = snapshot.val() || {};
+      updateStats();
+      renderTable();
+      setSyncStatus(true);
+    }, (err) => {
+      console.error('DB error:', err);
+      setSyncStatus(false);
+    });
+  }
+
+  function stopDatabaseListener() {
+    if (dbListener) {
+      samplesRef.off('value', dbListener);
+      dbListener = null;
+    }
+    allSamples = {};
+  }
+
+  // ═══════════════════════════════════════════════
+  //  EVERYTHING BELOW IS UNCHANGED FROM ORIGINAL
+  // ═══════════════════════════════════════════════
 
   function setSyncStatus(ok) {
     const badge = document.getElementById('sync-badge');
@@ -874,7 +1156,6 @@
       return;
     }
 
-    // Sort
     filtered.sort((a, b) => {
       let valA, valB;
       if (sortColumn === 'createdAt') {
@@ -1005,13 +1286,12 @@
       return;
     }
 
-    // Compress and convert to base64
     const reader = new FileReader();
     reader.onload = function(ev) {
       const img = new Image();
       img.onload = function() {
         const canvas = document.createElement('canvas');
-        const MAX = 800; // max dimension
+        const MAX = 800;
         let w = img.width, h = img.height;
         if (w > MAX || h > MAX) {
           if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
@@ -1021,7 +1301,7 @@
         canvas.height = h;
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
         const base64 = canvas.toDataURL('image/jpeg', 0.7);
-        selectedFile = base64; // store base64 string instead of File
+        selectedFile = base64;
 
         document.getElementById('upload-preview').src = base64;
         document.getElementById('upload-preview').style.display = 'block';
@@ -1061,7 +1341,6 @@
     try {
       let imageUrl = '';
 
-      // Keep existing image if editing and no new file
       if (editingKey && !selectedFile && allSamples[editingKey]?.imageUrl) {
         const preview = document.getElementById('upload-preview');
         if (preview.style.display !== 'none') {
@@ -1069,9 +1348,8 @@
         }
       }
 
-      // Use base64 string if a new image was selected
       if (selectedFile) {
-        imageUrl = selectedFile; // already a base64 string
+        imageUrl = selectedFile;
       }
 
       const data = {
@@ -1086,7 +1364,6 @@
       };
 
       if (editingKey) {
-        // Preserve createdAt
         data.createdAt = allSamples[editingKey]?.createdAt || Date.now();
         await samplesRef.child(editingKey).set(data);
         showToast('Sample updated ✓', 'success');
